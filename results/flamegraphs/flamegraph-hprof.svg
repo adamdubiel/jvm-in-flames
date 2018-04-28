@@ -1,0 +1,943 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" width="1200" height="146" onload="init(evt)" viewBox="0 0 1200 146" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<!-- Flame graph stack visualization. See https://github.com/brendangregg/FlameGraph for latest version, and http://www.brendangregg.com/flamegraphs.html for examples. -->
+<defs >
+	<linearGradient id="background" y1="0" y2="1" x1="0" x2="0" >
+		<stop stop-color="#eeeeee" offset="5%" />
+		<stop stop-color="#eeeeb0" offset="95%" />
+	</linearGradient>
+</defs>
+<style type="text/css">
+	.func_g:hover { stroke:black; stroke-width:0.5; cursor:pointer; }
+</style>
+<script type="text/ecmascript">
+<![CDATA[
+	var details, searchbtn, matchedtxt, svg;
+	function init(evt) {
+		details = document.getElementById("details").firstChild;
+		searchbtn = document.getElementById("search");
+		matchedtxt = document.getElementById("matched");
+		svg = document.getElementsByTagName("svg")[0];
+		searching = 0;
+	}
+
+	// mouse-over for info
+	function s(node) {		// show
+		info = g_to_text(node);
+		details.nodeValue = "Function: " + info;
+	}
+	function c() {			// clear
+		details.nodeValue = ' ';
+	}
+
+	// ctrl-F for search
+	window.addEventListener("keydown",function (e) {
+		if (e.keyCode === 114 || (e.ctrlKey && e.keyCode === 70)) {
+			e.preventDefault();
+			search_prompt();
+		}
+	})
+
+	// functions
+	function find_child(parent, name, attr) {
+		var children = parent.childNodes;
+		for (var i=0; i<children.length;i++) {
+			if (children[i].tagName == name)
+				return (attr != undefined) ? children[i].attributes[attr].value : children[i];
+		}
+		return;
+	}
+	function orig_save(e, attr, val) {
+		if (e.attributes["_orig_"+attr] != undefined) return;
+		if (e.attributes[attr] == undefined) return;
+		if (val == undefined) val = e.attributes[attr].value;
+		e.setAttribute("_orig_"+attr, val);
+	}
+	function orig_load(e, attr) {
+		if (e.attributes["_orig_"+attr] == undefined) return;
+		e.attributes[attr].value = e.attributes["_orig_"+attr].value;
+		e.removeAttribute("_orig_"+attr);
+	}
+	function g_to_text(e) {
+		var text = find_child(e, "title").firstChild.nodeValue;
+		return (text)
+	}
+	function g_to_func(e) {
+		var func = g_to_text(e);
+		if (func != null)
+			func = func.replace(/ .*/, "");
+		return (func);
+	}
+	function update_text(e) {
+		var r = find_child(e, "rect");
+		var t = find_child(e, "text");
+		var w = parseFloat(r.attributes["width"].value) -3;
+		var txt = find_child(e, "title").textContent.replace(/\([^(]*\)$/,"");
+		t.attributes["x"].value = parseFloat(r.attributes["x"].value) +3;
+
+		// Smaller than this size won't fit anything
+		if (w < 2*12*0.59) {
+			t.textContent = "";
+			return;
+		}
+
+		t.textContent = txt;
+		// Fit in full text width
+		if (/^ *$/.test(txt) || t.getSubStringLength(0, txt.length) < w)
+			return;
+
+		for (var x=txt.length-2; x>0; x--) {
+			if (t.getSubStringLength(0, x+2) <= w) {
+				t.textContent = txt.substring(0,x) + "..";
+				return;
+			}
+		}
+		t.textContent = "";
+	}
+
+	// zoom
+	function zoom_reset(e) {
+		if (e.attributes != undefined) {
+			orig_load(e, "x");
+			orig_load(e, "width");
+		}
+		if (e.childNodes == undefined) return;
+		for(var i=0, c=e.childNodes; i<c.length; i++) {
+			zoom_reset(c[i]);
+		}
+	}
+	function zoom_child(e, x, ratio) {
+		if (e.attributes != undefined) {
+			if (e.attributes["x"] != undefined) {
+				orig_save(e, "x");
+				e.attributes["x"].value = (parseFloat(e.attributes["x"].value) - x - 10) * ratio + 10;
+				if(e.tagName == "text") e.attributes["x"].value = find_child(e.parentNode, "rect", "x") + 3;
+			}
+			if (e.attributes["width"] != undefined) {
+				orig_save(e, "width");
+				e.attributes["width"].value = parseFloat(e.attributes["width"].value) * ratio;
+			}
+		}
+
+		if (e.childNodes == undefined) return;
+		for(var i=0, c=e.childNodes; i<c.length; i++) {
+			zoom_child(c[i], x-10, ratio);
+		}
+	}
+	function zoom_parent(e) {
+		if (e.attributes) {
+			if (e.attributes["x"] != undefined) {
+				orig_save(e, "x");
+				e.attributes["x"].value = 10;
+			}
+			if (e.attributes["width"] != undefined) {
+				orig_save(e, "width");
+				e.attributes["width"].value = parseInt(svg.width.baseVal.value) - (10*2);
+			}
+		}
+		if (e.childNodes == undefined) return;
+		for(var i=0, c=e.childNodes; i<c.length; i++) {
+			zoom_parent(c[i]);
+		}
+	}
+	function zoom(node) {
+		var attr = find_child(node, "rect").attributes;
+		var width = parseFloat(attr["width"].value);
+		var xmin = parseFloat(attr["x"].value);
+		var xmax = parseFloat(xmin + width);
+		var ymin = parseFloat(attr["y"].value);
+		var ratio = (svg.width.baseVal.value - 2*10) / width;
+
+		// XXX: Workaround for JavaScript float issues (fix me)
+		var fudge = 0.0001;
+
+		var unzoombtn = document.getElementById("unzoom");
+		unzoombtn.style["opacity"] = "1.0";
+
+		var el = document.getElementsByTagName("g");
+		for(var i=0;i<el.length;i++){
+			var e = el[i];
+			var a = find_child(e, "rect").attributes;
+			var ex = parseFloat(a["x"].value);
+			var ew = parseFloat(a["width"].value);
+			// Is it an ancestor
+			if (0 == 0) {
+				var upstack = parseFloat(a["y"].value) > ymin;
+			} else {
+				var upstack = parseFloat(a["y"].value) < ymin;
+			}
+			if (upstack) {
+				// Direct ancestor
+				if (ex <= xmin && (ex+ew+fudge) >= xmax) {
+					e.style["opacity"] = "0.5";
+					zoom_parent(e);
+					e.onclick = function(e){unzoom(); zoom(this);};
+					update_text(e);
+				}
+				// not in current path
+				else
+					e.style["display"] = "none";
+			}
+			// Children maybe
+			else {
+				// no common path
+				if (ex < xmin || ex + fudge >= xmax) {
+					e.style["display"] = "none";
+				}
+				else {
+					zoom_child(e, xmin, ratio);
+					e.onclick = function(e){zoom(this);};
+					update_text(e);
+				}
+			}
+		}
+	}
+	function unzoom() {
+		var unzoombtn = document.getElementById("unzoom");
+		unzoombtn.style["opacity"] = "0.0";
+
+		var el = document.getElementsByTagName("g");
+		for(i=0;i<el.length;i++) {
+			el[i].style["display"] = "block";
+			el[i].style["opacity"] = "1";
+			zoom_reset(el[i]);
+			update_text(el[i]);
+		}
+	}
+
+	// search
+	function reset_search() {
+		var el = document.getElementsByTagName("rect");
+		for (var i=0; i < el.length; i++) {
+			orig_load(el[i], "fill")
+		}
+	}
+	function search_prompt() {
+		if (!searching) {
+			var term = prompt("Enter a search term (regexp " +
+			    "allowed, eg: ^ext4_)", "");
+			if (term != null) {
+				search(term)
+			}
+		} else {
+			reset_search();
+			searching = 0;
+			searchbtn.style["opacity"] = "0.1";
+			searchbtn.firstChild.nodeValue = "Search"
+			matchedtxt.style["opacity"] = "0.0";
+			matchedtxt.firstChild.nodeValue = ""
+		}
+	}
+	function search(term) {
+		var re = new RegExp(term);
+		var el = document.getElementsByTagName("g");
+		var matches = new Object();
+		var maxwidth = 0;
+		for (var i = 0; i < el.length; i++) {
+			var e = el[i];
+			if (e.attributes["class"].value != "func_g")
+				continue;
+			var func = g_to_func(e);
+			var rect = find_child(e, "rect");
+			if (rect == null) {
+				// the rect might be wrapped in an anchor
+				// if nameattr href is being used
+				if (rect = find_child(e, "a")) {
+				    rect = find_child(r, "rect");
+				}
+			}
+			if (func == null || rect == null)
+				continue;
+
+			// Save max width. Only works as we have a root frame
+			var w = parseFloat(rect.attributes["width"].value);
+			if (w > maxwidth)
+				maxwidth = w;
+
+			if (func.match(re)) {
+				// highlight
+				var x = parseFloat(rect.attributes["x"].value);
+				orig_save(rect, "fill");
+				rect.attributes["fill"].value =
+				    "rgb(230,0,230)";
+
+				// remember matches
+				if (matches[x] == undefined) {
+					matches[x] = w;
+				} else {
+					if (w > matches[x]) {
+						// overwrite with parent
+						matches[x] = w;
+					}
+				}
+				searching = 1;
+			}
+		}
+		if (!searching)
+			return;
+
+		searchbtn.style["opacity"] = "1.0";
+		searchbtn.firstChild.nodeValue = "Reset Search"
+
+		// calculate percent matched, excluding vertical overlap
+		var count = 0;
+		var lastx = -1;
+		var lastw = 0;
+		var keys = Array();
+		for (k in matches) {
+			if (matches.hasOwnProperty(k))
+				keys.push(k);
+		}
+		// sort the matched frames by their x location
+		// ascending, then width descending
+		keys.sort(function(a, b){
+				return a - b;
+			if (a < b || a > b)
+				return a - b;
+			return matches[b] - matches[a];
+		});
+		// Step through frames saving only the biggest bottom-up frames
+		// thanks to the sort order. This relies on the tree property
+		// where children are always smaller than their parents.
+		for (var k in keys) {
+			var x = parseFloat(keys[k]);
+			var w = matches[keys[k]];
+			if (x >= lastx + lastw) {
+				count += w;
+				lastx = x;
+				lastw = w;
+			}
+		}
+		// display matched percent
+		matchedtxt.style["opacity"] = "1.0";
+		pct = 100 * count / maxwidth;
+		if (pct == 100)
+			pct = "100"
+		else
+			pct = pct.toFixed(1)
+		matchedtxt.firstChild.nodeValue = "Matched: " + pct + "%";
+	}
+	function searchover(e) {
+		searchbtn.style["opacity"] = "1.0";
+	}
+	function searchout(e) {
+		if (searching) {
+			searchbtn.style["opacity"] = "1.0";
+		} else {
+			searchbtn.style["opacity"] = "0.1";
+		}
+	}
+]]>
+</script>
+<rect x="0.0" y="0" width="1200.0" height="146.0" fill="url(#background)"  />
+<text text-anchor="middle" x="600.00" y="24" font-size="17" font-family="Verdana" fill="rgb(0,0,0)"  >Flame Graph</text>
+<text text-anchor="" x="10.00" y="129" font-size="12" font-family="Verdana" fill="rgb(0,0,0)" id="details" > </text>
+<text text-anchor="" x="10.00" y="24" font-size="12" font-family="Verdana" fill="rgb(0,0,0)" id="unzoom" onclick="unzoom()" style="opacity:0.0;cursor:pointer" >Reset Zoom</text>
+<text text-anchor="" x="1090.00" y="24" font-size="12" font-family="Verdana" fill="rgb(0,0,0)" id="search" onmouseover="searchover()" onmouseout="searchout()" onclick="search_prompt()" style="opacity:0.1;cursor:pointer" >Search</text>
+<text text-anchor="" x="1090.00" y="129" font-size="12" font-family="Verdana" fill="rgb(0,0,0)" id="matched" > </text>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.misc.Unsafe.defineAnonymousClass (5 samples, 0.01%)</title><rect x="13.8" y="33" width="0.2" height="15.0" fill="rgb(236,63,52)" rx="2" ry="2" />
+<text text-anchor="" x="16.81" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.SocketChannelImpl.read:326 (50 samples, 0.12%)</title><rect x="37.0" y="49" width="1.5" height="15.0" fill="rgb(212,210,37)" rx="2" ry="2" />
+<text text-anchor="" x="40.03" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.IOUtil.drain (11 samples, 0.03%)</title><rect x="1184.0" y="33" width="0.3" height="15.0" fill="rgb(251,185,49)" rx="2" ry="2" />
+<text text-anchor="" x="1186.95" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.EPollArrayWrapper.interrupt:317 (67 samples, 0.16%)</title><rect x="43.1" y="49" width="2.0" height="15.0" fill="rgb(212,227,39)" rx="2" ry="2" />
+<text text-anchor="" x="46.13" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.HashMap.put:612 (84 samples, 0.20%)</title><rect x="14.2" y="65" width="2.4" height="15.0" fill="rgb(208,171,26)" rx="2" ry="2" />
+<text text-anchor="" x="17.18" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.IOUtil.read:197 (89 samples, 0.22%)</title><rect x="64.4" y="81" width="2.6" height="15.0" fill="rgb(217,174,33)" rx="2" ry="2" />
+<text text-anchor="" x="67.43" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.SocketChannelImpl.write:504 (190 samples, 0.46%)</title><rect x="1184.3" y="81" width="5.4" height="15.0" fill="rgb(222,134,11)" rx="2" ry="2" />
+<text text-anchor="" x="1187.27" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.HashMap.putVal:629 (12 samples, 0.03%)</title><rect x="40.9" y="33" width="0.3" height="15.0" fill="rgb(252,200,45)" rx="2" ry="2" />
+<text text-anchor="" x="43.87" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.clients.producer.internals.Sender.run:126 (13 samples, 0.03%)</title><rect x="13.4" y="65" width="0.4" height="15.0" fill="rgb(227,112,36)" rx="2" ry="2" />
+<text text-anchor="" x="16.44" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.common.requests.ProduceRequest.&lt;init&gt;:33 (7 samples, 0.02%)</title><rect x="40.7" y="49" width="0.2" height="15.0" fill="rgb(248,136,3)" rx="2" ry="2" />
+<text text-anchor="" x="43.67" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.clients.producer.internals.Sender.run:219 (7 samples, 0.02%)</title><rect x="36.8" y="81" width="0.2" height="15.0" fill="rgb(252,187,45)" rx="2" ry="2" />
+<text text-anchor="" x="39.83" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.IOUtil.readIntoNativeBuffer:223 (50 samples, 0.12%)</title><rect x="63.0" y="65" width="1.4" height="15.0" fill="rgb(213,141,19)" rx="2" ry="2" />
+<text text-anchor="" x="66.00" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.common.requests.ProduceRequest$Builder.build:64 (7 samples, 0.02%)</title><rect x="40.7" y="65" width="0.2" height="15.0" fill="rgb(208,204,38)" rx="2" ry="2" />
+<text text-anchor="" x="43.67" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.xnio.nio.WorkerThread.executeAfter:631 (67 samples, 0.16%)</title><rect x="43.1" y="81" width="2.0" height="15.0" fill="rgb(221,158,17)" rx="2" ry="2" />
+<text text-anchor="" x="46.13" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.SocketChannelImpl.write:468 (87 samples, 0.21%)</title><rect x="10.5" y="49" width="2.5" height="15.0" fill="rgb(211,103,3)" rx="2" ry="2" />
+<text text-anchor="" x="13.52" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.common.requests.AbstractRequestResponse.sizeOf:34 (6 samples, 0.01%)</title><rect x="40.4" y="65" width="0.1" height="15.0" fill="rgb(215,74,25)" rx="2" ry="2" />
+<text text-anchor="" x="43.35" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com.codahale.metrics.Histogram.update:39 (8 samples, 0.02%)</title><rect x="10.1" y="49" width="0.3" height="15.0" fill="rgb(247,140,10)" rx="2" ry="2" />
+<text text-anchor="" x="13.14" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.security.provider.NativePRNG$RandomIO.ensureBufferValid:525 (10 samples, 0.02%)</title><rect x="1189.7" y="81" width="0.3" height="15.0" fill="rgb(214,134,27)" rx="2" ry="2" />
+<text text-anchor="" x="1192.71" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com.codahale.metrics.Timer.update:86 (8 samples, 0.02%)</title><rect x="10.1" y="81" width="0.3" height="15.0" fill="rgb(231,92,22)" rx="2" ry="2" />
+<text text-anchor="" x="13.14" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.EPollArrayWrapper.epollWait (38,714 samples, 94.04%)</title><rect x="71.4" y="33" width="1109.6" height="15.0" fill="rgb(230,62,3)" rx="2" ry="2" />
+<text text-anchor="" x="74.37" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >sun.nio.ch.EPollArrayWrapper.epollWait</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.EPollArrayWrapper.interrupt (67 samples, 0.16%)</title><rect x="43.1" y="33" width="2.0" height="15.0" fill="rgb(206,100,28)" rx="2" ry="2" />
+<text text-anchor="" x="46.13" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.Arrays.copyOf:3236 (9 samples, 0.02%)</title><rect x="13.2" y="33" width="0.2" height="15.0" fill="rgb(229,119,41)" rx="2" ry="2" />
+<text text-anchor="" x="16.18" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.EPollSelectorImpl.doSelect:104 (11 samples, 0.03%)</title><rect x="1184.0" y="49" width="0.3" height="15.0" fill="rgb(226,95,50)" rx="2" ry="2" />
+<text text-anchor="" x="1186.95" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.common.network.PlaintextTransportLayer.write:159 (24 samples, 0.06%)</title><rect x="38.7" y="81" width="0.7" height="15.0" fill="rgb(229,58,22)" rx="2" ry="2" />
+<text text-anchor="" x="41.72" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com.codahale.metrics.Timer.update:164 (8 samples, 0.02%)</title><rect x="10.1" y="65" width="0.3" height="15.0" fill="rgb(252,2,23)" rx="2" ry="2" />
+<text text-anchor="" x="13.14" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.lang.invoke.InnerClassLambdaMetafactory.spinInnerClass:326 (5 samples, 0.01%)</title><rect x="13.8" y="49" width="0.2" height="15.0" fill="rgb(218,182,7)" rx="2" ry="2" />
+<text text-anchor="" x="16.81" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>pl.allegro.tech.hermes.frontend.publishing.handlers.MessageReadHandler.handleRequest:52 (5 samples, 0.01%)</title><rect x="48.3" y="81" width="0.2" height="15.0" fill="rgb(224,204,52)" rx="2" ry="2" />
+<text text-anchor="" x="51.32" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.common.network.NetworkReceive.readFromReadableChannel:97 (9 samples, 0.02%)</title><rect x="38.5" y="81" width="0.2" height="15.0" fill="rgb(253,109,47)" rx="2" ry="2" />
+<text text-anchor="" x="41.46" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.common.requests.ProduceRequest.&lt;init&gt;:91 (12 samples, 0.03%)</title><rect x="40.9" y="81" width="0.3" height="15.0" fill="rgb(215,224,11)" rx="2" ry="2" />
+<text text-anchor="" x="43.87" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.IOUtil.readIntoNativeBuffer:223 (89 samples, 0.22%)</title><rect x="64.4" y="65" width="2.6" height="15.0" fill="rgb(217,89,23)" rx="2" ry="2" />
+<text text-anchor="" x="67.43" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.clients.producer.internals.Sender$SenderMetrics.updateProduceRequestMetrics:499 (7 samples, 0.02%)</title><rect x="13.6" y="33" width="0.2" height="15.0" fill="rgb(254,137,17)" rx="2" ry="2" />
+<text text-anchor="" x="16.61" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.common.requests.ProduceRequest.&lt;init&gt;:105 (7 samples, 0.02%)</title><rect x="40.7" y="33" width="0.2" height="15.0" fill="rgb(206,227,4)" rx="2" ry="2" />
+<text text-anchor="" x="43.67" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com.fasterxml.jackson.databind.ser.std.BeanSerializerBase.serializeFields:690 (5 samples, 0.01%)</title><rect x="10.4" y="49" width="0.1" height="15.0" fill="rgb(216,59,25)" rx="2" ry="2" />
+<text text-anchor="" x="13.37" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.NativeThread.current (9 samples, 0.02%)</title><rect x="38.5" y="33" width="0.2" height="15.0" fill="rgb(249,57,51)" rx="2" ry="2" />
+<text text-anchor="" x="41.46" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.misc.Unsafe.unpark (647 samples, 1.57%)</title><rect x="18.1" y="33" width="18.6" height="15.0" fill="rgb(210,170,11)" rx="2" ry="2" />
+<text text-anchor="" x="21.14" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.clients.NetworkClient.send:262 (7 samples, 0.02%)</title><rect x="36.8" y="33" width="0.2" height="15.0" fill="rgb(218,8,39)" rx="2" ry="2" />
+<text text-anchor="" x="39.83" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.common.protocol.types.Schema.sizeOf:88 (6 samples, 0.01%)</title><rect x="40.4" y="33" width="0.1" height="15.0" fill="rgb(216,228,14)" rx="2" ry="2" />
+<text text-anchor="" x="43.35" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.concurrent.locks.LockSupport.park:175 (54 samples, 0.13%)</title><rect x="16.6" y="49" width="1.5" height="15.0" fill="rgb(218,179,48)" rx="2" ry="2" />
+<text text-anchor="" x="19.59" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.common.requests.AbstractRequestResponse.serialize:67 (6 samples, 0.01%)</title><rect x="40.4" y="81" width="0.1" height="15.0" fill="rgb(247,21,10)" rx="2" ry="2" />
+<text text-anchor="" x="43.35" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.EPollSelectorImpl.doSelect:93 (502 samples, 1.22%)</title><rect x="48.5" y="81" width="14.4" height="15.0" fill="rgb(218,152,12)" rx="2" ry="2" />
+<text text-anchor="" x="51.46" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.SocketChannelImpl.read:326 (9 samples, 0.02%)</title><rect x="38.5" y="49" width="0.2" height="15.0" fill="rgb(213,133,4)" rx="2" ry="2" />
+<text text-anchor="" x="41.46" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.EPollArrayWrapper.interrupt (33 samples, 0.08%)</title><rect x="39.4" y="33" width="1.0" height="15.0" fill="rgb(209,34,50)" rx="2" ry="2" />
+<text text-anchor="" x="42.41" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.FileDispatcherImpl.read0 (89 samples, 0.22%)</title><rect x="64.4" y="33" width="2.6" height="15.0" fill="rgb(213,14,26)" rx="2" ry="2" />
+<text text-anchor="" x="67.43" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.SelectorImpl.selectNow:105 (11 samples, 0.03%)</title><rect x="1184.0" y="81" width="0.3" height="15.0" fill="rgb(205,153,38)" rx="2" ry="2" />
+<text text-anchor="" x="1186.95" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com.codahale.metrics.ExponentiallyDecayingReservoir.update:97 (5 samples, 0.01%)</title><rect x="10.0" y="33" width="0.1" height="15.0" fill="rgb(248,9,20)" rx="2" ry="2" />
+<text text-anchor="" x="13.00" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.HashMap.putVal:631 (5 samples, 0.01%)</title><rect x="62.9" y="33" width="0.1" height="15.0" fill="rgb(251,78,49)" rx="2" ry="2" />
+<text text-anchor="" x="65.85" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.HashMap.put:612 (5 samples, 0.01%)</title><rect x="62.9" y="49" width="0.1" height="15.0" fill="rgb(205,51,8)" rx="2" ry="2" />
+<text text-anchor="" x="65.85" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.concurrent.locks.AbstractQueuedSynchronizer.release:1264 (647 samples, 1.57%)</title><rect x="18.1" y="81" width="18.6" height="15.0" fill="rgb(214,47,37)" rx="2" ry="2" />
+<text text-anchor="" x="21.14" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.TreeSet.add:255 (5 samples, 0.01%)</title><rect x="48.3" y="49" width="0.2" height="15.0" fill="rgb(221,50,52)" rx="2" ry="2" />
+<text text-anchor="" x="51.32" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.IOUtil.write:51 (153 samples, 0.37%)</title><rect x="67.0" y="81" width="4.4" height="15.0" fill="rgb(217,160,50)" rx="2" ry="2" />
+<text text-anchor="" x="69.98" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.clients.producer.internals.Sender.run:208 (13 samples, 0.03%)</title><rect x="13.4" y="49" width="0.4" height="15.0" fill="rgb(252,29,19)" rx="2" ry="2" />
+<text text-anchor="" x="16.44" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com.codahale.metrics.ExponentiallyDecayingReservoir.update:83 (5 samples, 0.01%)</title><rect x="10.0" y="49" width="0.1" height="15.0" fill="rgb(229,195,25)" rx="2" ry="2" />
+<text text-anchor="" x="13.00" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.zip.ZipFile.getEntry:316 (5 samples, 0.01%)</title><rect x="36.7" y="49" width="0.1" height="15.0" fill="rgb(245,95,32)" rx="2" ry="2" />
+<text text-anchor="" x="39.68" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.EPollArrayWrapper.poll:269 (38,714 samples, 94.04%)</title><rect x="71.4" y="49" width="1109.6" height="15.0" fill="rgb(240,130,15)" rx="2" ry="2" />
+<text text-anchor="" x="74.37" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >sun.nio.ch.EPollArrayWrapper.poll:269</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.EPollSelectorImpl.updateSelectedKeys:131 (5 samples, 0.01%)</title><rect x="62.9" y="81" width="0.1" height="15.0" fill="rgb(229,164,39)" rx="2" ry="2" />
+<text text-anchor="" x="65.85" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.EPollSelectorImpl.wakeup:207 (67 samples, 0.16%)</title><rect x="43.1" y="65" width="2.0" height="15.0" fill="rgb(241,112,52)" rx="2" ry="2" />
+<text text-anchor="" x="46.13" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.lang.ClassLoader.defineClass:763 (8 samples, 0.02%)</title><rect x="14.0" y="49" width="0.2" height="15.0" fill="rgb(213,82,10)" rx="2" ry="2" />
+<text text-anchor="" x="16.96" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.TreeMap.put:575 (5 samples, 0.01%)</title><rect x="48.3" y="33" width="0.2" height="15.0" fill="rgb(248,103,23)" rx="2" ry="2" />
+<text text-anchor="" x="51.32" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.HashSet.add:220 (84 samples, 0.20%)</title><rect x="14.2" y="81" width="2.4" height="15.0" fill="rgb(211,26,42)" rx="2" ry="2" />
+<text text-anchor="" x="17.18" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.lang.Thread.run:748 (13 samples, 0.03%)</title><rect x="13.4" y="81" width="0.4" height="15.0" fill="rgb(209,128,15)" rx="2" ry="2" />
+<text text-anchor="" x="16.44" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.xnio.nio.WorkerThread.run:450 (5 samples, 0.01%)</title><rect x="45.1" y="81" width="0.1" height="15.0" fill="rgb(246,219,52)" rx="2" ry="2" />
+<text text-anchor="" x="48.05" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.EPollSelectorImpl.doSelect:104 (103 samples, 0.25%)</title><rect x="1181.0" y="49" width="3.0" height="15.0" fill="rgb(221,206,48)" rx="2" ry="2" />
+<text text-anchor="" x="1184.00" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.HashMap.put:612 (12 samples, 0.03%)</title><rect x="40.9" y="49" width="0.3" height="15.0" fill="rgb(223,99,21)" rx="2" ry="2" />
+<text text-anchor="" x="43.87" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.common.requests.AbstractRequestResponse.serialize:68 (5 samples, 0.01%)</title><rect x="40.5" y="81" width="0.2" height="15.0" fill="rgb(225,124,38)" rx="2" ry="2" />
+<text text-anchor="" x="43.53" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.FileDispatcherImpl.writev0 (190 samples, 0.46%)</title><rect x="1184.3" y="33" width="5.4" height="15.0" fill="rgb(235,20,37)" rx="2" ry="2" />
+<text text-anchor="" x="1187.27" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.common.network.PlaintextTransportLayer.read:110 (50 samples, 0.12%)</title><rect x="37.0" y="65" width="1.5" height="15.0" fill="rgb(220,224,21)" rx="2" ry="2" />
+<text text-anchor="" x="40.03" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>pl.allegro.tech.hermes.common.message.wrapper.JsonMessageContentWrapper.wrapContent:47 (12 samples, 0.03%)</title><rect x="48.0" y="81" width="0.3" height="15.0" fill="rgb(208,157,9)" rx="2" ry="2" />
+<text text-anchor="" x="50.98" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.jar.JarFile.getJarEntry:223 (5 samples, 0.01%)</title><rect x="36.7" y="81" width="0.1" height="15.0" fill="rgb(224,78,9)" rx="2" ry="2" />
+<text text-anchor="" x="39.68" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.SocketDispatcher.read:39 (89 samples, 0.22%)</title><rect x="64.4" y="49" width="2.6" height="15.0" fill="rgb(250,179,46)" rx="2" ry="2" />
+<text text-anchor="" x="67.43" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.SocketChannelImpl.read:326 (67 samples, 0.16%)</title><rect x="41.2" y="49" width="1.9" height="15.0" fill="rgb(229,160,30)" rx="2" ry="2" />
+<text text-anchor="" x="44.21" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.concurrent.LinkedBlockingQueue.take:442 (54 samples, 0.13%)</title><rect x="16.6" y="81" width="1.5" height="15.0" fill="rgb(231,84,14)" rx="2" ry="2" />
+<text text-anchor="" x="19.59" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.IOUtil.write:148 (190 samples, 0.46%)</title><rect x="1184.3" y="65" width="5.4" height="15.0" fill="rgb(228,99,46)" rx="2" ry="2" />
+<text text-anchor="" x="1187.27" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.NativeThread.current (50 samples, 0.12%)</title><rect x="37.0" y="33" width="1.5" height="15.0" fill="rgb(238,177,23)" rx="2" ry="2" />
+<text text-anchor="" x="40.03" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.EPollSelectorImpl.wakeup:207 (33 samples, 0.08%)</title><rect x="39.4" y="65" width="1.0" height="15.0" fill="rgb(253,90,10)" rx="2" ry="2" />
+<text text-anchor="" x="42.41" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.common.requests.ProduceRequest$Builder.build:46 (7 samples, 0.02%)</title><rect x="40.7" y="81" width="0.2" height="15.0" fill="rgb(247,199,34)" rx="2" ry="2" />
+<text text-anchor="" x="43.67" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.xnio.nio.WorkerThread.executeAfter:627 (5 samples, 0.01%)</title><rect x="48.3" y="65" width="0.2" height="15.0" fill="rgb(225,129,42)" rx="2" ry="2" />
+<text text-anchor="" x="51.32" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.common.utils.CollectionUtils.groupDataByTopic:37 (12 samples, 0.03%)</title><rect x="40.9" y="65" width="0.3" height="15.0" fill="rgb(234,200,49)" rx="2" ry="2" />
+<text text-anchor="" x="43.87" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.EPollArrayWrapper.interrupt:317 (33 samples, 0.08%)</title><rect x="39.4" y="49" width="1.0" height="15.0" fill="rgb(208,93,53)" rx="2" ry="2" />
+<text text-anchor="" x="42.41" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.NativeThread.current (67 samples, 0.16%)</title><rect x="41.2" y="33" width="1.9" height="15.0" fill="rgb(239,118,19)" rx="2" ry="2" />
+<text text-anchor="" x="44.21" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com.fasterxml.jackson.databind.ser.DefaultSerializerProvider.serializeValue:292 (5 samples, 0.01%)</title><rect x="10.4" y="81" width="0.1" height="15.0" fill="rgb(229,229,14)" rx="2" ry="2" />
+<text text-anchor="" x="13.37" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.xnio.nio.WorkerThread.setOps:769 (97 samples, 0.24%)</title><rect x="45.2" y="81" width="2.8" height="15.0" fill="rgb(253,148,44)" rx="2" ry="2" />
+<text text-anchor="" x="48.20" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.common.network.Selector.wakeup:217 (33 samples, 0.08%)</title><rect x="39.4" y="81" width="1.0" height="15.0" fill="rgb(210,142,22)" rx="2" ry="2" />
+<text text-anchor="" x="42.41" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.Arrays.copyOf:3236 (12 samples, 0.03%)</title><rect x="48.0" y="33" width="0.3" height="15.0" fill="rgb(236,22,38)" rx="2" ry="2" />
+<text text-anchor="" x="50.98" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.SocketDispatcher.read:39 (50 samples, 0.12%)</title><rect x="63.0" y="49" width="1.4" height="15.0" fill="rgb(224,51,52)" rx="2" ry="2" />
+<text text-anchor="" x="66.00" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.EPollArrayWrapper.interrupt (97 samples, 0.24%)</title><rect x="45.2" y="33" width="2.8" height="15.0" fill="rgb(228,13,19)" rx="2" ry="2" />
+<text text-anchor="" x="48.20" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.nio.channels.SocketChannel.write:502 (24 samples, 0.06%)</title><rect x="38.7" y="65" width="0.7" height="15.0" fill="rgb(230,37,15)" rx="2" ry="2" />
+<text text-anchor="" x="41.72" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.EPollArrayWrapper.epollCtl (502 samples, 1.22%)</title><rect x="48.5" y="33" width="14.4" height="15.0" fill="rgb(208,49,11)" rx="2" ry="2" />
+<text text-anchor="" x="51.46" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.xnio.nio.NioSocketConduit.write:164 (87 samples, 0.21%)</title><rect x="10.5" y="65" width="2.5" height="15.0" fill="rgb(251,224,46)" rx="2" ry="2" />
+<text text-anchor="" x="13.52" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.io.ByteArrayOutputStream.toByteArray:191 (12 samples, 0.03%)</title><rect x="48.0" y="49" width="0.3" height="15.0" fill="rgb(210,154,52)" rx="2" ry="2" />
+<text text-anchor="" x="50.98" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io.undertow.server.protocol.http.HttpResponseConduit.processWrite:242 (87 samples, 0.21%)</title><rect x="10.5" y="81" width="2.5" height="15.0" fill="rgb(213,19,10)" rx="2" ry="2" />
+<text text-anchor="" x="13.52" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.SocketChannelImpl.write:501 (24 samples, 0.06%)</title><rect x="38.7" y="49" width="0.7" height="15.0" fill="rgb(247,213,0)" rx="2" ry="2" />
+<text text-anchor="" x="41.72" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.FileDispatcherImpl.read0 (50 samples, 0.12%)</title><rect x="63.0" y="33" width="1.4" height="15.0" fill="rgb(240,144,39)" rx="2" ry="2" />
+<text text-anchor="" x="66.00" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.lang.invoke.InnerClassLambdaMetafactory.buildCallSite:194 (5 samples, 0.01%)</title><rect x="13.8" y="65" width="0.2" height="15.0" fill="rgb(231,96,30)" rx="2" ry="2" />
+<text text-anchor="" x="16.81" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.common.network.PlaintextTransportLayer.read:110 (9 samples, 0.02%)</title><rect x="38.5" y="65" width="0.2" height="15.0" fill="rgb(230,48,27)" rx="2" ry="2" />
+<text text-anchor="" x="41.46" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.EPollArrayWrapper.interrupt:317 (97 samples, 0.24%)</title><rect x="45.2" y="49" width="2.8" height="15.0" fill="rgb(207,101,22)" rx="2" ry="2" />
+<text text-anchor="" x="48.20" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.xnio.nio.NioSocketConduit.read:319 (67 samples, 0.16%)</title><rect x="41.2" y="65" width="1.9" height="15.0" fill="rgb(220,104,23)" rx="2" ry="2" />
+<text text-anchor="" x="44.21" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.misc.Unsafe.park (54 samples, 0.13%)</title><rect x="16.6" y="33" width="1.5" height="15.0" fill="rgb(218,138,28)" rx="2" ry="2" />
+<text text-anchor="" x="19.59" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.concurrent.locks.LockSupport.unpark:141 (647 samples, 1.57%)</title><rect x="18.1" y="49" width="18.6" height="15.0" fill="rgb(253,25,24)" rx="2" ry="2" />
+<text text-anchor="" x="21.14" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.EPollArrayWrapper.updateRegistrations:299 (502 samples, 1.22%)</title><rect x="48.5" y="49" width="14.4" height="15.0" fill="rgb(225,75,8)" rx="2" ry="2" />
+<text text-anchor="" x="51.46" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.clients.producer.internals.Sender.sendProduceRequest:364 (7 samples, 0.02%)</title><rect x="36.8" y="49" width="0.2" height="15.0" fill="rgb(251,156,29)" rx="2" ry="2" />
+<text text-anchor="" x="39.83" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.lang.invoke.LambdaMetafactory.metafactory:304 (5 samples, 0.01%)</title><rect x="13.8" y="81" width="0.2" height="15.0" fill="rgb(236,85,12)" rx="2" ry="2" />
+<text text-anchor="" x="16.81" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.FileDispatcherImpl.write0 (153 samples, 0.37%)</title><rect x="67.0" y="33" width="4.4" height="15.0" fill="rgb(211,155,24)" rx="2" ry="2" />
+<text text-anchor="" x="69.98" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.xnio.conduits.AbstractStreamSourceConduit.read:51 (67 samples, 0.16%)</title><rect x="41.2" y="81" width="1.9" height="15.0" fill="rgb(210,87,1)" rx="2" ry="2" />
+<text text-anchor="" x="44.21" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.net.URLClassLoader.defineClass:467 (8 samples, 0.02%)</title><rect x="14.0" y="81" width="0.2" height="15.0" fill="rgb(215,91,2)" rx="2" ry="2" />
+<text text-anchor="" x="16.96" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.HashMap.put:612 (6 samples, 0.01%)</title><rect x="13.0" y="49" width="0.2" height="15.0" fill="rgb(209,199,46)" rx="2" ry="2" />
+<text text-anchor="" x="16.01" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.concurrent.locks.AbstractQueuedSynchronizer.unparkSuccessor:662 (647 samples, 1.57%)</title><rect x="18.1" y="65" width="18.6" height="15.0" fill="rgb(249,80,46)" rx="2" ry="2" />
+<text text-anchor="" x="21.14" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.IOUtil.drain (103 samples, 0.25%)</title><rect x="1181.0" y="33" width="3.0" height="15.0" fill="rgb(217,32,27)" rx="2" ry="2" />
+<text text-anchor="" x="1184.00" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.common.protocol.types.Schema.write:52 (5 samples, 0.01%)</title><rect x="40.5" y="33" width="0.2" height="15.0" fill="rgb(205,220,12)" rx="2" ry="2" />
+<text text-anchor="" x="43.53" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.SelectorImpl.lockAndDoSelect:86 (11 samples, 0.03%)</title><rect x="1184.0" y="65" width="0.3" height="15.0" fill="rgb(215,92,4)" rx="2" ry="2" />
+<text text-anchor="" x="1186.95" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.EPollSelectorImpl.doSelect:93 (38,714 samples, 94.04%)</title><rect x="71.4" y="65" width="1109.6" height="15.0" fill="rgb(215,97,33)" rx="2" ry="2" />
+<text text-anchor="" x="74.37" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >sun.nio.ch.EPollSelectorImpl.doSelect:93</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com.fasterxml.jackson.databind.ser.BeanSerializer.serialize:155 (5 samples, 0.01%)</title><rect x="10.4" y="65" width="0.1" height="15.0" fill="rgb(236,118,21)" rx="2" ry="2" />
+<text text-anchor="" x="13.37" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.IOUtil.writeFromNativeBuffer:93 (153 samples, 0.37%)</title><rect x="67.0" y="65" width="4.4" height="15.0" fill="rgb(247,81,39)" rx="2" ry="2" />
+<text text-anchor="" x="69.98" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.zip.ZipFile.getEntry (5 samples, 0.01%)</title><rect x="36.7" y="33" width="0.1" height="15.0" fill="rgb(245,51,41)" rx="2" ry="2" />
+<text text-anchor="" x="39.68" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.common.protocol.types.Struct.writeTo:257 (5 samples, 0.01%)</title><rect x="40.5" y="49" width="0.2" height="15.0" fill="rgb(233,48,43)" rx="2" ry="2" />
+<text text-anchor="" x="43.53" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>all (41,169 samples, 100%)</title><rect x="10.0" y="97" width="1180.0" height="15.0" fill="rgb(247,108,1)" rx="2" ry="2" />
+<text text-anchor="" x="13.00" y="107.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>pl.allegro.tech.hermes.common.message.wrapper.JsonMessageContentWrapper.wrapContent:64 (12 samples, 0.03%)</title><rect x="48.0" y="65" width="0.3" height="15.0" fill="rgb(232,222,41)" rx="2" ry="2" />
+<text text-anchor="" x="50.98" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io.undertow.util.PathTemplateMatcher.handleStemMatch:82 (6 samples, 0.01%)</title><rect x="13.0" y="81" width="0.2" height="15.0" fill="rgb(239,52,6)" rx="2" ry="2" />
+<text text-anchor="" x="16.01" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.NativeThread.current (87 samples, 0.21%)</title><rect x="10.5" y="33" width="2.5" height="15.0" fill="rgb(229,38,53)" rx="2" ry="2" />
+<text text-anchor="" x="13.52" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com.codahale.metrics.Histogram.update:39 (5 samples, 0.01%)</title><rect x="10.0" y="65" width="0.1" height="15.0" fill="rgb(222,40,1)" rx="2" ry="2" />
+<text text-anchor="" x="13.00" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.security.provider.NativePRNG$RandomIO.readFully:424 (10 samples, 0.02%)</title><rect x="1189.7" y="65" width="0.3" height="15.0" fill="rgb(224,171,37)" rx="2" ry="2" />
+<text text-anchor="" x="1192.71" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.lang.System.nanoTime (5 samples, 0.01%)</title><rect x="45.1" y="65" width="0.1" height="15.0" fill="rgb(212,65,29)" rx="2" ry="2" />
+<text text-anchor="" x="48.05" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.lang.ClassLoader.defineClass1 (8 samples, 0.02%)</title><rect x="14.0" y="33" width="0.2" height="15.0" fill="rgb(245,142,11)" rx="2" ry="2" />
+<text text-anchor="" x="16.96" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.io.ByteArrayOutputStream.grow:118 (9 samples, 0.02%)</title><rect x="13.2" y="49" width="0.2" height="15.0" fill="rgb(231,114,30)" rx="2" ry="2" />
+<text text-anchor="" x="16.18" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.HashSet.add:220 (5 samples, 0.01%)</title><rect x="62.9" y="65" width="0.1" height="15.0" fill="rgb(227,13,20)" rx="2" ry="2" />
+<text text-anchor="" x="65.85" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.jar.JarFile.getEntry:240 (5 samples, 0.01%)</title><rect x="36.7" y="65" width="0.1" height="15.0" fill="rgb(237,58,10)" rx="2" ry="2" />
+<text text-anchor="" x="39.68" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.SelectorImpl.lockAndDoSelect:86 (103 samples, 0.25%)</title><rect x="1181.0" y="65" width="3.0" height="15.0" fill="rgb(254,91,24)" rx="2" ry="2" />
+<text text-anchor="" x="1184.00" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.NativeThread.current (24 samples, 0.06%)</title><rect x="38.7" y="33" width="0.7" height="15.0" fill="rgb(217,88,21)" rx="2" ry="2" />
+<text text-anchor="" x="41.72" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io.undertow.util.PathTemplate.matches:244 (6 samples, 0.01%)</title><rect x="13.0" y="65" width="0.2" height="15.0" fill="rgb(235,47,0)" rx="2" ry="2" />
+<text text-anchor="" x="16.01" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.HashMap.putVal:629 (6 samples, 0.01%)</title><rect x="13.0" y="33" width="0.2" height="15.0" fill="rgb(240,158,50)" rx="2" ry="2" />
+<text text-anchor="" x="16.01" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.clients.producer.internals.Sender.sendProduceRequests:339 (7 samples, 0.02%)</title><rect x="36.8" y="65" width="0.2" height="15.0" fill="rgb(207,45,47)" rx="2" ry="2" />
+<text text-anchor="" x="39.83" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.io.ByteArrayOutputStream.ensureCapacity:93 (9 samples, 0.02%)</title><rect x="13.2" y="65" width="0.2" height="15.0" fill="rgb(243,58,10)" rx="2" ry="2" />
+<text text-anchor="" x="16.18" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.SelectorImpl.select:97 (103 samples, 0.25%)</title><rect x="1181.0" y="81" width="3.0" height="15.0" fill="rgb(224,94,45)" rx="2" ry="2" />
+<text text-anchor="" x="1184.00" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.EPollArrayWrapper.poll:268 (502 samples, 1.22%)</title><rect x="48.5" y="65" width="14.4" height="15.0" fill="rgb(252,108,41)" rx="2" ry="2" />
+<text text-anchor="" x="51.46" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com.codahale.metrics.ExponentiallyDecayingReservoir.update:83 (8 samples, 0.02%)</title><rect x="10.1" y="33" width="0.3" height="15.0" fill="rgb(231,57,25)" rx="2" ry="2" />
+<text text-anchor="" x="13.14" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.IOUtil.read:192 (50 samples, 0.12%)</title><rect x="63.0" y="81" width="1.4" height="15.0" fill="rgb(208,108,11)" rx="2" ry="2" />
+<text text-anchor="" x="66.00" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.io.FileInputStream.readBytes (10 samples, 0.02%)</title><rect x="1189.7" y="33" width="0.3" height="15.0" fill="rgb(243,133,32)" rx="2" ry="2" />
+<text text-anchor="" x="1192.71" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.io.ByteArrayOutputStream.write:153 (9 samples, 0.02%)</title><rect x="13.2" y="81" width="0.2" height="15.0" fill="rgb(253,86,43)" rx="2" ry="2" />
+<text text-anchor="" x="16.18" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com.fasterxml.jackson.databind.ser.BeanPropertyWriter.serializeAsField:704 (5 samples, 0.01%)</title><rect x="10.4" y="33" width="0.1" height="15.0" fill="rgb(248,126,9)" rx="2" ry="2" />
+<text text-anchor="" x="13.37" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.lang.Object.hashCode (84 samples, 0.20%)</title><rect x="14.2" y="33" width="2.4" height="15.0" fill="rgb(228,147,42)" rx="2" ry="2" />
+<text text-anchor="" x="17.18" y="43.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.SocketDispatcher.writev:51 (190 samples, 0.46%)</title><rect x="1184.3" y="49" width="5.4" height="15.0" fill="rgb(234,61,52)" rx="2" ry="2" />
+<text text-anchor="" x="1187.27" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.io.FileInputStream.read:255 (10 samples, 0.02%)</title><rect x="1189.7" y="49" width="0.3" height="15.0" fill="rgb(217,111,33)" rx="2" ry="2" />
+<text text-anchor="" x="1192.71" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.common.network.NetworkReceive.readFromReadableChannel:81 (50 samples, 0.12%)</title><rect x="37.0" y="81" width="1.5" height="15.0" fill="rgb(233,10,20)" rx="2" ry="2" />
+<text text-anchor="" x="40.03" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.EPollSelectorImpl.wakeup:207 (97 samples, 0.24%)</title><rect x="45.2" y="65" width="2.8" height="15.0" fill="rgb(216,176,46)" rx="2" ry="2" />
+<text text-anchor="" x="48.20" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.SocketDispatcher.write:47 (153 samples, 0.37%)</title><rect x="67.0" y="49" width="4.4" height="15.0" fill="rgb(209,169,1)" rx="2" ry="2" />
+<text text-anchor="" x="69.98" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.security.SecureClassLoader.defineClass:142 (8 samples, 0.02%)</title><rect x="14.0" y="65" width="0.2" height="15.0" fill="rgb(238,109,11)" rx="2" ry="2" />
+<text text-anchor="" x="16.96" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun.nio.ch.SelectorImpl.lockAndDoSelect:86 (38,714 samples, 94.04%)</title><rect x="71.4" y="81" width="1109.6" height="15.0" fill="rgb(210,52,27)" rx="2" ry="2" />
+<text text-anchor="" x="74.37" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >sun.nio.ch.SelectorImpl.lockAndDoSelect:86</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com.codahale.metrics.Timer.update:164 (5 samples, 0.01%)</title><rect x="10.0" y="81" width="0.1" height="15.0" fill="rgb(216,202,11)" rx="2" ry="2" />
+<text text-anchor="" x="13.00" y="91.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.HashMap.hash:339 (84 samples, 0.20%)</title><rect x="14.2" y="49" width="2.4" height="15.0" fill="rgb(233,36,38)" rx="2" ry="2" />
+<text text-anchor="" x="17.18" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.common.requests.AbstractRequestResponse.writeTo:41 (5 samples, 0.01%)</title><rect x="40.5" y="65" width="0.2" height="15.0" fill="rgb(222,217,20)" rx="2" ry="2" />
+<text text-anchor="" x="43.53" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org.apache.kafka.common.protocol.types.Struct.sizeOf:250 (6 samples, 0.01%)</title><rect x="40.4" y="49" width="0.1" height="15.0" fill="rgb(252,229,27)" rx="2" ry="2" />
+<text text-anchor="" x="43.35" y="59.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await:2039 (54 samples, 0.13%)</title><rect x="16.6" y="65" width="1.5" height="15.0" fill="rgb(232,50,0)" rx="2" ry="2" />
+<text text-anchor="" x="19.59" y="75.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+</svg>

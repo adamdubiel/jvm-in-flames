@@ -1,0 +1,767 @@
+JAVA PROFILE 1.0.1, created Tue Apr 24 08:54:08 2018
+
+Copyright (c) 2003, 2005, Oracle and/or its affiliates. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+  - Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+
+  - Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+
+  - Neither the name of Oracle nor the names of its
+    contributors may be used to endorse or promote products derived
+    from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+Header for -agentlib:hprof (or -Xrunhprof) ASCII Output (JDK 5.0 JVMTI based)
+
+WARNING!  This file format is under development, and is subject to
+change without notice.
+
+This file contains the following types of records:
+
+THREAD START
+THREAD END      mark the lifetime of Java threads
+
+TRACE           represents a Java stack trace.  Each trace consists
+                of a series of stack frames.  Other records refer to
+                TRACEs to identify (1) where object allocations have
+                taken place, (2) the frames in which GC roots were
+                found, and (3) frequently executed methods.
+
+HEAP DUMP       is a complete snapshot of all live objects in the Java
+                heap.  Following distinctions are made:
+
+                ROOT    root set as determined by GC
+                CLS     classes 
+                OBJ     instances
+                ARR     arrays
+
+SITES           is a sorted list of allocation sites.  This identifies
+                the most heavily allocated object types, and the TRACE
+                at which those allocations occurred.
+
+CPU SAMPLES     is a statistical profile of program execution.  The VM
+                periodically samples all running threads, and assigns
+                a quantum to active TRACEs in those threads.  Entries
+                in this record are TRACEs ranked by the percentage of
+                total quanta they consumed; top-ranked TRACEs are
+                typically hot spots in the program.
+
+CPU TIME        is a profile of program execution obtained by measuring
+                the time spent in individual methods (excluding the time
+                spent in callees), as well as by counting the number of
+                times each method is called. Entries in this record are
+                TRACEs ranked by the percentage of total CPU time. The
+                "count" field indicates the number of times each TRACE 
+                is invoked.
+
+MONITOR TIME    is a profile of monitor contention obtained by measuring
+                the time spent by a thread waiting to enter a monitor.
+                Entries in this record are TRACEs ranked by the percentage
+                of total monitor contention time and a brief description
+                of the monitor.  The "count" field indicates the number of 
+                times the monitor was contended at that TRACE.
+
+MONITOR DUMP    is a complete snapshot of all the monitors and threads in 
+                the System.
+
+HEAP DUMP, SITES, CPU SAMPLES|TIME and MONITOR DUMP|TIME records are generated 
+at program exit.  They can also be obtained during program execution by typing 
+Ctrl-\ (on Solaris) or by typing Ctrl-Break (on Win32).
+
+--------
+
+THREAD START (obj=50000193, id = 200001, name="main", group="main")
+THREAD START (obj=50000193, id = 200004, name="hermes-curator-0", group="main")
+THREAD START (obj=5000097f, id = 200005, name="main-SendThread()", group="main")
+THREAD START (obj=50000999, id = 200006, name="main-EventThread", group="main")
+THREAD START (obj=50000193, id = 200007, name="hermes-curator-1", group="main")
+THREAD START (obj=50000193, id = 200008, name="metrics-zookeeper-reporter-1-thread-1", group="main")
+THREAD START (obj=50000193, id = 200009, name="pool-2-thread-1", group="main")
+THREAD START (obj=50000193, id = 200010, name="Curator-PathChildrenCache-0", group="main")
+THREAD START (obj=500010be, id = 200011, name="kafka-producer-network-thread | producer-1", group="main")
+THREAD START (obj=500010be, id = 200012, name="kafka-producer-network-thread | producer-2", group="main")
+THREAD START (obj=500011af, id = 200013, name="XNIO-1 I/O-1", group="main")
+THREAD START (obj=500011af, id = 200018, name="XNIO-1 I/O-6", group="main")
+THREAD START (obj=500011af, id = 200016, name="XNIO-1 I/O-4", group="main")
+THREAD START (obj=500011af, id = 200015, name="XNIO-1 I/O-3", group="main")
+THREAD START (obj=500011af, id = 200014, name="XNIO-1 I/O-2", group="main")
+THREAD START (obj=500011af, id = 200017, name="XNIO-1 I/O-5", group="main")
+THREAD START (obj=500011af, id = 200021, name="XNIO-1 Accept", group="main")
+THREAD START (obj=500011af, id = 200019, name="XNIO-1 I/O-7", group="main")
+THREAD START (obj=500011af, id = 200020, name="XNIO-1 I/O-8", group="main")
+THREAD END (id = 200001)
+THREAD START (obj=50000193, id = 200022, name="DestroyJavaVM", group="main")
+THREAD START (obj=50000193, id = 200024, name="XNIO-1 task-3", group="main")
+THREAD START (obj=50000193, id = 200027, name="XNIO-1 task-6", group="main")
+THREAD START (obj=50000193, id = 200023, name="XNIO-1 task-1", group="main")
+THREAD START (obj=50000193, id = 200029, name="XNIO-1 task-4", group="main")
+THREAD START (obj=50000193, id = 200028, name="XNIO-1 task-9", group="main")
+THREAD START (obj=50000193, id = 200031, name="XNIO-1 task-8", group="main")
+THREAD START (obj=50000193, id = 200032, name="XNIO-1 task-13", group="main")
+THREAD START (obj=50000193, id = 200033, name="XNIO-1 task-14", group="main")
+THREAD START (obj=50000193, id = 200034, name="XNIO-1 task-15", group="main")
+THREAD START (obj=50000193, id = 200025, name="XNIO-1 task-5", group="main")
+THREAD START (obj=50000193, id = 200026, name="XNIO-1 task-2", group="main")
+THREAD START (obj=50000193, id = 200036, name="XNIO-1 task-16", group="main")
+THREAD START (obj=50000193, id = 200037, name="XNIO-1 task-17", group="main")
+THREAD START (obj=50000193, id = 200030, name="XNIO-1 task-10", group="main")
+THREAD START (obj=50000193, id = 200038, name="XNIO-1 task-12", group="main")
+THREAD START (obj=50000193, id = 200039, name="XNIO-1 task-11", group="main")
+THREAD START (obj=50000193, id = 200035, name="XNIO-1 task-7", group="main")
+THREAD START (obj=50000193, id = 200041, name="XNIO-1 task-19", group="main")
+THREAD START (obj=50000193, id = 200040, name="XNIO-1 task-18", group="main")
+THREAD START (obj=50000193, id = 200042, name="XNIO-1 task-20", group="main")
+THREAD START (obj=50000193, id = 200043, name="XNIO-1 task-21", group="main")
+THREAD START (obj=50000193, id = 200047, name="XNIO-1 task-37", group="main")
+THREAD START (obj=50000193, id = 200057, name="XNIO-1 task-24", group="main")
+THREAD START (obj=50000193, id = 200056, name="XNIO-1 task-26", group="main")
+THREAD START (obj=50000193, id = 200055, name="XNIO-1 task-27", group="main")
+THREAD START (obj=50000193, id = 200051, name="XNIO-1 task-31", group="main")
+THREAD START (obj=50000193, id = 200049, name="XNIO-1 task-34", group="main")
+THREAD START (obj=50000193, id = 200052, name="XNIO-1 task-30", group="main")
+THREAD START (obj=50000193, id = 200050, name="XNIO-1 task-33", group="main")
+THREAD START (obj=50000193, id = 200053, name="XNIO-1 task-29", group="main")
+THREAD START (obj=50000193, id = 200054, name="XNIO-1 task-28", group="main")
+THREAD START (obj=50000193, id = 200048, name="XNIO-1 task-35", group="main")
+THREAD START (obj=50000193, id = 200046, name="XNIO-1 task-39", group="main")
+THREAD START (obj=50000193, id = 200045, name="XNIO-1 task-40", group="main")
+THREAD START (obj=50000193, id = 200058, name="XNIO-1 task-22", group="main")
+THREAD START (obj=50000193, id = 200061, name="XNIO-1 task-36", group="main")
+THREAD START (obj=50000193, id = 200059, name="XNIO-1 task-25", group="main")
+THREAD START (obj=50000193, id = 200060, name="XNIO-1 task-32", group="main")
+THREAD START (obj=50000193, id = 200062, name="XNIO-1 task-38", group="main")
+THREAD START (obj=50000193, id = 200044, name="XNIO-1 task-23", group="main")
+THREAD START (obj=50000193, id = 200063, name="XNIO-1 task-43", group="main")
+THREAD START (obj=50000193, id = 200066, name="XNIO-1 task-48", group="main")
+THREAD START (obj=50000193, id = 200069, name="XNIO-1 task-51", group="main")
+THREAD START (obj=50000193, id = 200070, name="XNIO-1 task-52", group="main")
+THREAD START (obj=50000193, id = 200072, name="XNIO-1 task-54", group="main")
+THREAD START (obj=50000193, id = 200076, name="XNIO-1 task-58", group="main")
+THREAD START (obj=50000193, id = 200078, name="XNIO-1 task-60", group="main")
+THREAD START (obj=50000193, id = 200080, name="XNIO-1 task-62", group="main")
+THREAD START (obj=50000193, id = 200082, name="XNIO-1 task-64", group="main")
+THREAD START (obj=50000193, id = 200084, name="XNIO-1 task-66", group="main")
+THREAD START (obj=50000193, id = 200085, name="XNIO-1 task-42", group="main")
+THREAD START (obj=50000193, id = 200086, name="XNIO-1 task-68", group="main")
+THREAD START (obj=50000193, id = 200087, name="XNIO-1 task-70", group="main")
+THREAD START (obj=50000193, id = 200068, name="XNIO-1 task-45", group="main")
+THREAD START (obj=50000193, id = 200067, name="XNIO-1 task-49", group="main")
+THREAD START (obj=50000193, id = 200093, name="XNIO-1 task-50", group="main")
+THREAD START (obj=50000193, id = 200065, name="XNIO-1 task-41", group="main")
+THREAD START (obj=50000193, id = 200090, name="XNIO-1 task-75", group="main")
+THREAD START (obj=50000193, id = 200091, name="XNIO-1 task-47", group="main")
+THREAD START (obj=50000193, id = 200092, name="XNIO-1 task-46", group="main")
+THREAD START (obj=50000193, id = 200064, name="XNIO-1 task-44", group="main")
+THREAD START (obj=50000193, id = 200089, name="XNIO-1 task-73", group="main")
+THREAD START (obj=50000193, id = 200095, name="XNIO-1 task-77", group="main")
+THREAD START (obj=50000193, id = 200088, name="XNIO-1 task-71", group="main")
+THREAD START (obj=50000193, id = 200099, name="XNIO-1 task-72", group="main")
+THREAD START (obj=50000193, id = 200081, name="XNIO-1 task-63", group="main")
+THREAD START (obj=50000193, id = 200083, name="XNIO-1 task-65", group="main")
+THREAD START (obj=50000193, id = 200077, name="XNIO-1 task-59", group="main")
+THREAD START (obj=50000193, id = 200075, name="XNIO-1 task-57", group="main")
+THREAD START (obj=50000193, id = 200074, name="XNIO-1 task-56", group="main")
+THREAD START (obj=50000193, id = 200104, name="XNIO-1 task-89", group="main")
+THREAD START (obj=50000193, id = 200073, name="XNIO-1 task-55", group="main")
+THREAD START (obj=50000193, id = 200071, name="XNIO-1 task-53", group="main")
+THREAD START (obj=50000193, id = 200102, name="XNIO-1 task-86", group="main")
+THREAD START (obj=50000193, id = 200079, name="XNIO-1 task-61", group="main")
+THREAD START (obj=50000193, id = 200103, name="XNIO-1 task-88", group="main")
+THREAD START (obj=50000193, id = 200101, name="XNIO-1 task-67", group="main")
+THREAD START (obj=50000193, id = 200100, name="XNIO-1 task-84", group="main")
+THREAD START (obj=50000193, id = 200106, name="XNIO-1 task-69", group="main")
+THREAD START (obj=50000193, id = 200112, name="XNIO-1 task-95", group="main")
+THREAD START (obj=50000193, id = 200098, name="XNIO-1 task-74", group="main")
+THREAD START (obj=50000193, id = 200097, name="XNIO-1 task-83", group="main")
+THREAD START (obj=50000193, id = 200113, name="XNIO-1 task-97", group="main")
+THREAD START (obj=50000193, id = 200096, name="XNIO-1 task-76", group="main")
+THREAD START (obj=50000193, id = 200094, name="XNIO-1 task-78", group="main")
+THREAD START (obj=50000193, id = 200116, name="XNIO-1 task-80", group="main")
+THREAD START (obj=50000193, id = 200115, name="XNIO-1 task-81", group="main")
+THREAD START (obj=50000193, id = 200114, name="XNIO-1 task-82", group="main")
+THREAD START (obj=50000193, id = 200110, name="XNIO-1 task-93", group="main")
+THREAD START (obj=50000193, id = 200120, name="XNIO-1 task-98", group="main")
+THREAD START (obj=50000193, id = 200109, name="XNIO-1 task-92", group="main")
+THREAD START (obj=50000193, id = 200108, name="XNIO-1 task-90", group="main")
+THREAD START (obj=50000193, id = 200107, name="XNIO-1 task-85", group="main")
+THREAD START (obj=50000193, id = 200105, name="XNIO-1 task-87", group="main")
+THREAD START (obj=50000193, id = 200111, name="XNIO-1 task-94", group="main")
+THREAD START (obj=50000193, id = 200119, name="XNIO-1 task-100", group="main")
+THREAD START (obj=50000193, id = 200123, name="XNIO-1 task-102", group="main")
+THREAD START (obj=50000193, id = 200124, name="XNIO-1 task-99", group="main")
+THREAD START (obj=50000193, id = 200125, name="XNIO-1 task-111", group="main")
+THREAD START (obj=50000193, id = 200118, name="XNIO-1 task-96", group="main")
+THREAD START (obj=50000193, id = 200117, name="XNIO-1 task-79", group="main")
+THREAD START (obj=50000193, id = 200126, name="XNIO-1 task-112", group="main")
+THREAD START (obj=50000193, id = 200122, name="XNIO-1 task-103", group="main")
+THREAD START (obj=50000193, id = 200129, name="XNIO-1 task-108", group="main")
+THREAD START (obj=50000193, id = 200131, name="XNIO-1 task-110", group="main")
+THREAD START (obj=50000193, id = 200121, name="XNIO-1 task-91", group="main")
+THREAD START (obj=50000193, id = 200130, name="XNIO-1 task-107", group="main")
+THREAD START (obj=50000193, id = 200128, name="XNIO-1 task-113", group="main")
+THREAD START (obj=50000193, id = 200127, name="XNIO-1 task-101", group="main")
+THREAD START (obj=50000193, id = 200137, name="XNIO-1 task-117", group="main")
+THREAD START (obj=50000193, id = 200136, name="XNIO-1 task-105", group="main")
+THREAD START (obj=50000193, id = 200135, name="XNIO-1 task-104", group="main")
+THREAD START (obj=50000193, id = 200132, name="XNIO-1 task-109", group="main")
+THREAD START (obj=50000193, id = 200134, name="XNIO-1 task-106", group="main")
+THREAD START (obj=50000193, id = 200133, name="XNIO-1 task-115", group="main")
+THREAD START (obj=50000193, id = 200138, name="XNIO-1 task-116", group="main")
+THREAD START (obj=50000193, id = 200147, name="XNIO-1 task-129", group="main")
+THREAD START (obj=50000193, id = 200146, name="XNIO-1 task-128", group="main")
+THREAD START (obj=50000193, id = 200145, name="XNIO-1 task-126", group="main")
+THREAD START (obj=50000193, id = 200150, name="XNIO-1 task-135", group="main")
+THREAD START (obj=50000193, id = 200151, name="XNIO-1 task-131", group="main")
+THREAD START (obj=50000193, id = 200154, name="XNIO-1 task-138", group="main")
+THREAD START (obj=50000193, id = 200144, name="XNIO-1 task-125", group="main")
+THREAD START (obj=50000193, id = 200139, name="XNIO-1 task-120", group="main")
+THREAD START (obj=50000193, id = 200143, name="XNIO-1 task-121", group="main")
+THREAD START (obj=50000193, id = 200142, name="XNIO-1 task-118", group="main")
+THREAD START (obj=50000193, id = 200157, name="XNIO-1 task-123", group="main")
+THREAD START (obj=50000193, id = 200141, name="XNIO-1 task-119", group="main")
+THREAD START (obj=50000193, id = 200140, name="XNIO-1 task-114", group="main")
+THREAD START (obj=50000193, id = 200159, name="XNIO-1 task-142", group="main")
+THREAD START (obj=50000193, id = 200156, name="XNIO-1 task-139", group="main")
+THREAD START (obj=50000193, id = 200155, name="XNIO-1 task-124", group="main")
+THREAD START (obj=50000193, id = 200152, name="XNIO-1 task-136", group="main")
+THREAD START (obj=50000193, id = 200149, name="XNIO-1 task-134", group="main")
+THREAD START (obj=50000193, id = 200166, name="XNIO-1 task-140", group="main")
+THREAD START (obj=50000193, id = 200148, name="XNIO-1 task-130", group="main")
+THREAD START (obj=50000193, id = 200165, name="XNIO-1 task-141", group="main")
+THREAD START (obj=50000193, id = 200153, name="XNIO-1 task-137", group="main")
+THREAD START (obj=50000193, id = 200169, name="XNIO-1 task-133", group="main")
+THREAD START (obj=50000193, id = 200168, name="XNIO-1 task-151", group="main")
+THREAD START (obj=50000193, id = 200167, name="XNIO-1 task-150", group="main")
+THREAD START (obj=50000193, id = 200177, name="XNIO-1 task-152", group="main")
+THREAD START (obj=50000193, id = 200178, name="XNIO-1 task-149", group="main")
+THREAD START (obj=50000193, id = 200164, name="XNIO-1 task-147", group="main")
+THREAD START (obj=50000193, id = 200163, name="XNIO-1 task-145", group="main")
+THREAD START (obj=50000193, id = 200162, name="XNIO-1 task-143", group="main")
+THREAD START (obj=50000193, id = 200181, name="XNIO-1 task-146", group="main")
+THREAD START (obj=50000193, id = 200158, name="XNIO-1 task-127", group="main")
+THREAD START (obj=50000193, id = 200160, name="XNIO-1 task-122", group="main")
+THREAD START (obj=50000193, id = 200161, name="XNIO-1 task-144", group="main")
+THREAD START (obj=50000193, id = 200179, name="XNIO-1 task-160", group="main")
+THREAD START (obj=50000193, id = 200180, name="XNIO-1 task-161", group="main")
+THREAD START (obj=50000193, id = 200171, name="XNIO-1 task-132", group="main")
+THREAD START (obj=50000193, id = 200172, name="XNIO-1 task-155", group="main")
+THREAD START (obj=50000193, id = 200170, name="XNIO-1 task-153", group="main")
+THREAD START (obj=50000193, id = 200173, name="XNIO-1 task-156", group="main")
+THREAD START (obj=50000193, id = 200175, name="XNIO-1 task-157", group="main")
+THREAD START (obj=50000193, id = 200174, name="XNIO-1 task-154", group="main")
+THREAD START (obj=50000193, id = 200176, name="XNIO-1 task-158", group="main")
+THREAD START (obj=50000193, id = 200185, name="XNIO-1 task-164", group="main")
+THREAD START (obj=50000193, id = 200186, name="XNIO-1 task-165", group="main")
+THREAD START (obj=50000193, id = 200183, name="XNIO-1 task-163", group="main")
+THREAD START (obj=50000193, id = 200182, name="XNIO-1 task-148", group="main")
+THREAD START (obj=50000193, id = 200193, name="XNIO-1 task-176", group="main")
+THREAD START (obj=50000193, id = 200188, name="XNIO-1 task-172", group="main")
+THREAD START (obj=50000193, id = 200187, name="XNIO-1 task-171", group="main")
+THREAD START (obj=50000193, id = 200184, name="XNIO-1 task-159", group="main")
+THREAD START (obj=50000193, id = 200196, name="XNIO-1 task-182", group="main")
+THREAD START (obj=50000193, id = 200199, name="XNIO-1 task-170", group="main")
+THREAD START (obj=50000193, id = 200201, name="XNIO-1 task-168", group="main")
+THREAD START (obj=50000193, id = 200198, name="XNIO-1 task-169", group="main")
+THREAD START (obj=50000193, id = 200197, name="XNIO-1 task-183", group="main")
+THREAD START (obj=50000193, id = 200195, name="XNIO-1 task-174", group="main")
+THREAD START (obj=50000193, id = 200194, name="XNIO-1 task-178", group="main")
+THREAD START (obj=50000193, id = 200192, name="XNIO-1 task-177", group="main")
+THREAD START (obj=50000193, id = 200191, name="XNIO-1 task-162", group="main")
+THREAD START (obj=50000193, id = 200190, name="XNIO-1 task-175", group="main")
+THREAD START (obj=50000193, id = 200189, name="XNIO-1 task-173", group="main")
+THREAD START (obj=50000193, id = 200202, name="XNIO-1 task-167", group="main")
+THREAD START (obj=50000193, id = 200200, name="XNIO-1 task-166", group="main")
+THREAD START (obj=50000193, id = 200203, name="XNIO-1 task-187", group="main")
+THREAD START (obj=50000193, id = 200204, name="XNIO-1 task-188", group="main")
+THREAD START (obj=50000193, id = 200215, name="XNIO-1 task-196", group="main")
+THREAD START (obj=50000193, id = 200218, name="XNIO-1 task-195", group="main")
+THREAD START (obj=50000193, id = 200219, name="XNIO-1 task-199", group="main")
+THREAD START (obj=50000193, id = 200220, name="XNIO-1 task-200", group="main")
+THREAD START (obj=50000193, id = 200216, name="XNIO-1 task-186", group="main")
+THREAD START (obj=50000193, id = 200214, name="XNIO-1 task-181", group="main")
+THREAD START (obj=50000193, id = 200221, name="XNIO-1 task-197", group="main")
+THREAD START (obj=50000193, id = 200213, name="XNIO-1 task-184", group="main")
+THREAD START (obj=50000193, id = 200212, name="XNIO-1 task-190", group="main")
+THREAD START (obj=50000193, id = 200211, name="XNIO-1 task-191", group="main")
+THREAD START (obj=50000193, id = 200210, name="XNIO-1 task-192", group="main")
+THREAD START (obj=50000193, id = 200209, name="XNIO-1 task-194", group="main")
+THREAD START (obj=50000193, id = 200208, name="XNIO-1 task-193", group="main")
+THREAD START (obj=50000193, id = 200207, name="XNIO-1 task-189", group="main")
+THREAD START (obj=50000193, id = 200206, name="XNIO-1 task-179", group="main")
+THREAD START (obj=50000193, id = 200205, name="XNIO-1 task-180", group="main")
+THREAD START (obj=50000193, id = 200217, name="XNIO-1 task-185", group="main")
+THREAD START (obj=50000193, id = 200222, name="XNIO-1 task-198", group="main")
+THREAD START (obj=50000193, id = 200224, name="SIGINT handler", group="system")
+THREAD START (obj=500010be, id = 200225, name="Thread-0", group="main")
+THREAD END (id = 200225)
+THREAD START (obj=500010be, id = 200226, name="Thread-1", group="main")
+THREAD END (id = 200013)
+THREAD END (id = 200015)
+THREAD END (id = 200016)
+THREAD END (id = 200014)
+THREAD END (id = 200020)
+THREAD END (id = 200017)
+THREAD END (id = 200019)
+THREAD END (id = 200021)
+THREAD END (id = 200018)
+THREAD END (id = 200110)
+THREAD END (id = 200115)
+THREAD END (id = 200107)
+THREAD END (id = 200078)
+THREAD END (id = 200133)
+THREAD END (id = 200102)
+THREAD END (id = 200114)
+THREAD END (id = 200216)
+THREAD END (id = 200213)
+THREAD END (id = 200033)
+THREAD END (id = 200101)
+THREAD END (id = 200024)
+THREAD END (id = 200179)
+THREAD END (id = 200165)
+THREAD END (id = 200034)
+THREAD END (id = 200025)
+THREAD END (id = 200047)
+THREAD END (id = 200200)
+THREAD END (id = 200077)
+THREAD END (id = 200214)
+THREAD END (id = 200090)
+THREAD END (id = 200036)
+THREAD END (id = 200116)
+THREAD END (id = 200139)
+THREAD END (id = 200157)
+THREAD END (id = 200037)
+THREAD END (id = 200131)
+THREAD END (id = 200104)
+THREAD END (id = 200046)
+THREAD END (id = 200113)
+THREAD END (id = 200088)
+THREAD END (id = 200185)
+THREAD END (id = 200204)
+THREAD END (id = 200150)
+THREAD END (id = 200222)
+THREAD END (id = 200048)
+THREAD END (id = 200166)
+THREAD END (id = 200169)
+THREAD END (id = 200123)
+THREAD END (id = 200122)
+THREAD END (id = 200045)
+THREAD END (id = 200154)
+THREAD END (id = 200218)
+THREAD END (id = 200129)
+THREAD END (id = 200211)
+THREAD END (id = 200043)
+THREAD END (id = 200206)
+THREAD END (id = 200091)
+THREAD END (id = 200195)
+THREAD END (id = 200058)
+THREAD END (id = 200186)
+THREAD END (id = 200052)
+THREAD END (id = 200076)
+THREAD END (id = 200140)
+THREAD END (id = 200050)
+THREAD END (id = 200083)
+THREAD END (id = 200130)
+THREAD END (id = 200155)
+THREAD END (id = 200026)
+THREAD END (id = 200066)
+THREAD END (id = 200100)
+THREAD END (id = 200182)
+THREAD END (id = 200143)
+THREAD END (id = 200027)
+THREAD END (id = 200171)
+THREAD END (id = 200079)
+THREAD END (id = 200099)
+THREAD END (id = 200059)
+THREAD END (id = 200177)
+THREAD END (id = 200098)
+THREAD END (id = 200120)
+THREAD END (id = 200162)
+THREAD END (id = 200035)
+THREAD END (id = 200067)
+THREAD END (id = 200173)
+THREAD END (id = 200080)
+THREAD END (id = 200141)
+THREAD END (id = 200219)
+THREAD END (id = 200174)
+THREAD END (id = 200112)
+THREAD END (id = 200215)
+THREAD END (id = 200194)
+THREAD END (id = 200196)
+THREAD END (id = 200111)
+THREAD END (id = 200068)
+THREAD END (id = 200049)
+THREAD END (id = 200074)
+THREAD END (id = 200089)
+THREAD END (id = 200164)
+THREAD END (id = 200175)
+THREAD END (id = 200072)
+THREAD END (id = 200056)
+THREAD END (id = 200147)
+THREAD END (id = 200137)
+THREAD END (id = 200163)
+THREAD END (id = 200207)
+THREAD END (id = 200144)
+THREAD END (id = 200187)
+THREAD END (id = 200044)
+THREAD END (id = 200176)
+THREAD END (id = 200132)
+THREAD END (id = 200145)
+THREAD END (id = 200212)
+THREAD END (id = 200205)
+THREAD END (id = 200152)
+THREAD END (id = 200109)
+THREAD END (id = 200142)
+THREAD END (id = 200069)
+THREAD END (id = 200183)
+THREAD END (id = 200042)
+THREAD END (id = 200062)
+THREAD END (id = 200188)
+THREAD END (id = 200092)
+THREAD END (id = 200159)
+THREAD END (id = 200097)
+THREAD END (id = 200039)
+THREAD END (id = 200168)
+THREAD END (id = 200106)
+THREAD END (id = 200125)
+THREAD END (id = 200160)
+THREAD END (id = 200151)
+THREAD END (id = 200135)
+THREAD END (id = 200221)
+THREAD END (id = 200202)
+THREAD END (id = 200103)
+THREAD END (id = 200124)
+THREAD END (id = 200189)
+THREAD END (id = 200153)
+THREAD END (id = 200038)
+THREAD END (id = 200158)
+THREAD END (id = 200053)
+THREAD END (id = 200075)
+THREAD END (id = 200071)
+THREAD END (id = 200172)
+THREAD END (id = 200087)
+THREAD END (id = 200148)
+THREAD END (id = 200031)
+THREAD END (id = 200057)
+THREAD END (id = 200209)
+THREAD END (id = 200167)
+THREAD END (id = 200180)
+THREAD END (id = 200201)
+THREAD END (id = 200096)
+THREAD END (id = 200065)
+THREAD END (id = 200029)
+THREAD END (id = 200156)
+THREAD END (id = 200178)
+THREAD END (id = 200181)
+THREAD END (id = 200041)
+THREAD END (id = 200121)
+THREAD END (id = 200184)
+THREAD END (id = 200198)
+THREAD END (id = 200030)
+THREAD END (id = 200119)
+THREAD END (id = 200095)
+THREAD END (id = 200197)
+THREAD END (id = 200118)
+THREAD END (id = 200199)
+THREAD END (id = 200084)
+THREAD END (id = 200081)
+THREAD END (id = 200170)
+THREAD END (id = 200192)
+THREAD END (id = 200203)
+THREAD END (id = 200070)
+THREAD END (id = 200220)
+THREAD END (id = 200190)
+THREAD END (id = 200086)
+THREAD END (id = 200023)
+THREAD END (id = 200028)
+THREAD END (id = 200208)
+THREAD END (id = 200108)
+THREAD END (id = 200126)
+THREAD END (id = 200055)
+THREAD END (id = 200082)
+THREAD END (id = 200054)
+THREAD END (id = 200085)
+THREAD END (id = 200061)
+THREAD END (id = 200149)
+THREAD END (id = 200051)
+THREAD END (id = 200060)
+THREAD END (id = 200146)
+THREAD END (id = 200105)
+THREAD END (id = 200210)
+THREAD END (id = 200117)
+THREAD END (id = 200040)
+THREAD END (id = 200093)
+THREAD END (id = 200136)
+THREAD END (id = 200128)
+THREAD END (id = 200138)
+THREAD END (id = 200032)
+THREAD END (id = 200127)
+THREAD END (id = 200161)
+THREAD END (id = 200134)
+THREAD END (id = 200193)
+THREAD END (id = 200217)
+THREAD END (id = 200094)
+THREAD END (id = 200064)
+THREAD END (id = 200191)
+THREAD END (id = 200063)
+THREAD END (id = 200073)
+THREAD END (id = 200012)
+THREAD END (id = 200011)
+THREAD END (id = 200009)
+THREAD END (id = 200007)
+THREAD END (id = 200004)
+THREAD END (id = 200006)
+THREAD END (id = 200226)
+THREAD END (id = 200224)
+TRACE 300730:
+	sun.nio.ch.EPollArrayWrapper.epollWait(EPollArrayWrapper.java:Unknown line)
+	sun.nio.ch.EPollArrayWrapper.poll(EPollArrayWrapper.java:269)
+	sun.nio.ch.EPollSelectorImpl.doSelect(EPollSelectorImpl.java:93)
+	sun.nio.ch.SelectorImpl.lockAndDoSelect(SelectorImpl.java:86)
+TRACE 300987:
+	sun.misc.Unsafe.unpark(Unsafe.java:Unknown line)
+	java.util.concurrent.locks.LockSupport.unpark(LockSupport.java:141)
+	java.util.concurrent.locks.AbstractQueuedSynchronizer.unparkSuccessor(AbstractQueuedSynchronizer.java:662)
+	java.util.concurrent.locks.AbstractQueuedSynchronizer.release(AbstractQueuedSynchronizer.java:1264)
+TRACE 300973:
+	sun.nio.ch.EPollArrayWrapper.epollCtl(EPollArrayWrapper.java:Unknown line)
+	sun.nio.ch.EPollArrayWrapper.updateRegistrations(EPollArrayWrapper.java:299)
+	sun.nio.ch.EPollArrayWrapper.poll(EPollArrayWrapper.java:268)
+	sun.nio.ch.EPollSelectorImpl.doSelect(EPollSelectorImpl.java:93)
+TRACE 300998:
+	sun.nio.ch.FileDispatcherImpl.writev0(FileDispatcherImpl.java:Unknown line)
+	sun.nio.ch.SocketDispatcher.writev(SocketDispatcher.java:51)
+	sun.nio.ch.IOUtil.write(IOUtil.java:148)
+	sun.nio.ch.SocketChannelImpl.write(SocketChannelImpl.java:504)
+TRACE 300995:
+	sun.nio.ch.FileDispatcherImpl.write0(FileDispatcherImpl.java:Unknown line)
+	sun.nio.ch.SocketDispatcher.write(SocketDispatcher.java:47)
+	sun.nio.ch.IOUtil.writeFromNativeBuffer(IOUtil.java:93)
+	sun.nio.ch.IOUtil.write(IOUtil.java:51)
+TRACE 301033:
+	sun.nio.ch.IOUtil.drain(IOUtil.java:Unknown line)
+	sun.nio.ch.EPollSelectorImpl.doSelect(EPollSelectorImpl.java:104)
+	sun.nio.ch.SelectorImpl.lockAndDoSelect(SelectorImpl.java:86)
+	sun.nio.ch.SelectorImpl.select(SelectorImpl.java:97)
+TRACE 301003:
+	sun.nio.ch.EPollArrayWrapper.interrupt(EPollArrayWrapper.java:Unknown line)
+	sun.nio.ch.EPollArrayWrapper.interrupt(EPollArrayWrapper.java:317)
+	sun.nio.ch.EPollSelectorImpl.wakeup(EPollSelectorImpl.java:207)
+	org.xnio.nio.WorkerThread.setOps(WorkerThread.java:769)
+TRACE 301020:
+	sun.nio.ch.FileDispatcherImpl.read0(FileDispatcherImpl.java:Unknown line)
+	sun.nio.ch.SocketDispatcher.read(SocketDispatcher.java:39)
+	sun.nio.ch.IOUtil.readIntoNativeBuffer(IOUtil.java:223)
+	sun.nio.ch.IOUtil.read(IOUtil.java:197)
+TRACE 301028:
+	sun.nio.ch.NativeThread.current(NativeThread.java:Unknown line)
+	sun.nio.ch.SocketChannelImpl.write(SocketChannelImpl.java:468)
+	org.xnio.nio.NioSocketConduit.write(NioSocketConduit.java:164)
+	io.undertow.server.protocol.http.HttpResponseConduit.processWrite(HttpResponseConduit.java:242)
+TRACE 301031:
+	java.lang.Object.hashCode(Object.java:Unknown line)
+	java.util.HashMap.hash(HashMap.java:339)
+	java.util.HashMap.put(HashMap.java:612)
+	java.util.HashSet.add(HashSet.java:220)
+TRACE 300990:
+	sun.nio.ch.EPollArrayWrapper.interrupt(EPollArrayWrapper.java:Unknown line)
+	sun.nio.ch.EPollArrayWrapper.interrupt(EPollArrayWrapper.java:317)
+	sun.nio.ch.EPollSelectorImpl.wakeup(EPollSelectorImpl.java:207)
+	org.xnio.nio.WorkerThread.executeAfter(WorkerThread.java:631)
+TRACE 301038:
+	sun.nio.ch.NativeThread.current(NativeThread.java:Unknown line)
+	sun.nio.ch.SocketChannelImpl.read(SocketChannelImpl.java:326)
+	org.xnio.nio.NioSocketConduit.read(NioSocketConduit.java:319)
+	org.xnio.conduits.AbstractStreamSourceConduit.read(AbstractStreamSourceConduit.java:51)
+TRACE 300985:
+	sun.misc.Unsafe.park(Unsafe.java:Unknown line)
+	java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
+	java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
+	java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:442)
+TRACE 300982:
+	sun.nio.ch.NativeThread.current(NativeThread.java:Unknown line)
+	sun.nio.ch.SocketChannelImpl.read(SocketChannelImpl.java:326)
+	org.apache.kafka.common.network.PlaintextTransportLayer.read(PlaintextTransportLayer.java:110)
+	org.apache.kafka.common.network.NetworkReceive.readFromReadableChannel(NetworkReceive.java:81)
+TRACE 301005:
+	sun.nio.ch.FileDispatcherImpl.read0(FileDispatcherImpl.java:Unknown line)
+	sun.nio.ch.SocketDispatcher.read(SocketDispatcher.java:39)
+	sun.nio.ch.IOUtil.readIntoNativeBuffer(IOUtil.java:223)
+	sun.nio.ch.IOUtil.read(IOUtil.java:192)
+TRACE 301062:
+	sun.nio.ch.EPollArrayWrapper.interrupt(EPollArrayWrapper.java:Unknown line)
+	sun.nio.ch.EPollArrayWrapper.interrupt(EPollArrayWrapper.java:317)
+	sun.nio.ch.EPollSelectorImpl.wakeup(EPollSelectorImpl.java:207)
+	org.apache.kafka.common.network.Selector.wakeup(Selector.java:217)
+TRACE 301040:
+	sun.nio.ch.NativeThread.current(NativeThread.java:Unknown line)
+	sun.nio.ch.SocketChannelImpl.write(SocketChannelImpl.java:501)
+	java.nio.channels.SocketChannel.write(SocketChannel.java:502)
+	org.apache.kafka.common.network.PlaintextTransportLayer.write(PlaintextTransportLayer.java:159)
+TRACE 301043:
+	java.util.HashMap.putVal(HashMap.java:629)
+	java.util.HashMap.put(HashMap.java:612)
+	org.apache.kafka.common.utils.CollectionUtils.groupDataByTopic(CollectionUtils.java:37)
+	org.apache.kafka.common.requests.ProduceRequest.<init>(ProduceRequest.java:91)
+TRACE 301100:
+	java.util.Arrays.copyOf(Arrays.java:3236)
+	java.io.ByteArrayOutputStream.toByteArray(ByteArrayOutputStream.java:191)
+	pl.allegro.tech.hermes.common.message.wrapper.JsonMessageContentWrapper.wrapContent(JsonMessageContentWrapper.java:64)
+	pl.allegro.tech.hermes.common.message.wrapper.JsonMessageContentWrapper.wrapContent(JsonMessageContentWrapper.java:47)
+TRACE 301069:
+	sun.nio.ch.IOUtil.drain(IOUtil.java:Unknown line)
+	sun.nio.ch.EPollSelectorImpl.doSelect(EPollSelectorImpl.java:104)
+	sun.nio.ch.SelectorImpl.lockAndDoSelect(SelectorImpl.java:86)
+	sun.nio.ch.SelectorImpl.selectNow(SelectorImpl.java:105)
+TRACE 301015:
+	java.io.FileInputStream.readBytes(FileInputStream.java:Unknown line)
+	java.io.FileInputStream.read(FileInputStream.java:255)
+	sun.security.provider.NativePRNG$RandomIO.readFully(NativePRNG.java:424)
+	sun.security.provider.NativePRNG$RandomIO.ensureBufferValid(NativePRNG.java:525)
+TRACE 301101:
+	sun.nio.ch.NativeThread.current(NativeThread.java:Unknown line)
+	sun.nio.ch.SocketChannelImpl.read(SocketChannelImpl.java:326)
+	org.apache.kafka.common.network.PlaintextTransportLayer.read(PlaintextTransportLayer.java:110)
+	org.apache.kafka.common.network.NetworkReceive.readFromReadableChannel(NetworkReceive.java:97)
+TRACE 301110:
+	java.util.Arrays.copyOf(Arrays.java:3236)
+	java.io.ByteArrayOutputStream.grow(ByteArrayOutputStream.java:118)
+	java.io.ByteArrayOutputStream.ensureCapacity(ByteArrayOutputStream.java:93)
+	java.io.ByteArrayOutputStream.write(ByteArrayOutputStream.java:153)
+TRACE 300101:
+	java.lang.ClassLoader.defineClass1(ClassLoader.java:Unknown line)
+	java.lang.ClassLoader.defineClass(ClassLoader.java:763)
+	java.security.SecureClassLoader.defineClass(SecureClassLoader.java:142)
+	java.net.URLClassLoader.defineClass(URLClassLoader.java:467)
+TRACE 301050:
+	com.codahale.metrics.ExponentiallyDecayingReservoir.update(ExponentiallyDecayingReservoir.java:83)
+	com.codahale.metrics.Histogram.update(Histogram.java:39)
+	com.codahale.metrics.Timer.update(Timer.java:164)
+	com.codahale.metrics.Timer.update(Timer.java:86)
+TRACE 301079:
+	org.apache.kafka.clients.producer.internals.Sender$SenderMetrics.updateProduceRequestMetrics(Sender.java:499)
+	org.apache.kafka.clients.producer.internals.Sender.run(Sender.java:208)
+	org.apache.kafka.clients.producer.internals.Sender.run(Sender.java:126)
+	java.lang.Thread.run(Thread.java:748)
+TRACE 301125:
+	org.apache.kafka.common.requests.ProduceRequest.<init>(ProduceRequest.java:105)
+	org.apache.kafka.common.requests.ProduceRequest.<init>(ProduceRequest.java:33)
+	org.apache.kafka.common.requests.ProduceRequest$Builder.build(ProduceRequest.java:64)
+	org.apache.kafka.common.requests.ProduceRequest$Builder.build(ProduceRequest.java:46)
+TRACE 301199:
+	org.apache.kafka.clients.NetworkClient.send(NetworkClient.java:262)
+	org.apache.kafka.clients.producer.internals.Sender.sendProduceRequest(Sender.java:364)
+	org.apache.kafka.clients.producer.internals.Sender.sendProduceRequests(Sender.java:339)
+	org.apache.kafka.clients.producer.internals.Sender.run(Sender.java:219)
+TRACE 301026:
+	org.apache.kafka.common.protocol.types.Schema.sizeOf(Schema.java:88)
+	org.apache.kafka.common.protocol.types.Struct.sizeOf(Struct.java:250)
+	org.apache.kafka.common.requests.AbstractRequestResponse.sizeOf(AbstractRequestResponse.java:34)
+	org.apache.kafka.common.requests.AbstractRequestResponse.serialize(AbstractRequestResponse.java:67)
+TRACE 301068:
+	org.apache.kafka.clients.producer.internals.Sender.run(Sender.java:208)
+	org.apache.kafka.clients.producer.internals.Sender.run(Sender.java:126)
+	java.lang.Thread.run(Thread.java:748)
+TRACE 301070:
+	java.util.HashMap.putVal(HashMap.java:629)
+	java.util.HashMap.put(HashMap.java:612)
+	io.undertow.util.PathTemplate.matches(PathTemplate.java:244)
+	io.undertow.util.PathTemplateMatcher.handleStemMatch(PathTemplateMatcher.java:82)
+TRACE 300124:
+	java.util.zip.ZipFile.getEntry(ZipFile.java:Unknown line)
+	java.util.zip.ZipFile.getEntry(ZipFile.java:316)
+	java.util.jar.JarFile.getEntry(JarFile.java:240)
+	java.util.jar.JarFile.getJarEntry(JarFile.java:223)
+TRACE 300659:
+	sun.misc.Unsafe.defineAnonymousClass(Unsafe.java:Unknown line)
+	java.lang.invoke.InnerClassLambdaMetafactory.spinInnerClass(InnerClassLambdaMetafactory.java:326)
+	java.lang.invoke.InnerClassLambdaMetafactory.buildCallSite(InnerClassLambdaMetafactory.java:194)
+	java.lang.invoke.LambdaMetafactory.metafactory(LambdaMetafactory.java:304)
+TRACE 300977:
+	java.lang.System.nanoTime(System.java:Unknown line)
+	org.xnio.nio.WorkerThread.run(WorkerThread.java:450)
+TRACE 301064:
+	java.util.HashMap.putVal(HashMap.java:631)
+	java.util.HashMap.put(HashMap.java:612)
+	java.util.HashSet.add(HashSet.java:220)
+	sun.nio.ch.EPollSelectorImpl.updateSelectedKeys(EPollSelectorImpl.java:131)
+TRACE 301078:
+	java.util.TreeMap.put(TreeMap.java:575)
+	java.util.TreeSet.add(TreeSet.java:255)
+	org.xnio.nio.WorkerThread.executeAfter(WorkerThread.java:627)
+	pl.allegro.tech.hermes.frontend.publishing.handlers.MessageReadHandler.handleRequest(MessageReadHandler.java:52)
+TRACE 301088:
+	org.apache.kafka.common.protocol.types.Schema.write(Schema.java:52)
+	org.apache.kafka.common.protocol.types.Struct.writeTo(Struct.java:257)
+	org.apache.kafka.common.requests.AbstractRequestResponse.writeTo(AbstractRequestResponse.java:41)
+	org.apache.kafka.common.requests.AbstractRequestResponse.serialize(AbstractRequestResponse.java:68)
+TRACE 301099:
+	com.codahale.metrics.ExponentiallyDecayingReservoir.update(ExponentiallyDecayingReservoir.java:97)
+	com.codahale.metrics.ExponentiallyDecayingReservoir.update(ExponentiallyDecayingReservoir.java:83)
+	com.codahale.metrics.Histogram.update(Histogram.java:39)
+	com.codahale.metrics.Timer.update(Timer.java:164)
+TRACE 301132:
+	com.fasterxml.jackson.databind.ser.BeanPropertyWriter.serializeAsField(BeanPropertyWriter.java:704)
+	com.fasterxml.jackson.databind.ser.std.BeanSerializerBase.serializeFields(BeanSerializerBase.java:690)
+	com.fasterxml.jackson.databind.ser.BeanSerializer.serialize(BeanSerializer.java:155)
+	com.fasterxml.jackson.databind.ser.DefaultSerializerProvider.serializeValue(DefaultSerializerProvider.java:292)
+CPU SAMPLES BEGIN (total = 41540) Tue Apr 24 08:59:55 2018
+rank   self  accum   count trace method
+   1 93.20% 93.20%   38714 300730 sun.nio.ch.EPollArrayWrapper.epollWait
+   2  1.56% 94.75%     647 300987 sun.misc.Unsafe.unpark
+   3  1.21% 95.96%     502 300973 sun.nio.ch.EPollArrayWrapper.epollCtl
+   4  0.46% 96.42%     190 300998 sun.nio.ch.FileDispatcherImpl.writev0
+   5  0.37% 96.79%     153 300995 sun.nio.ch.FileDispatcherImpl.write0
+   6  0.25% 97.04%     103 301033 sun.nio.ch.IOUtil.drain
+   7  0.23% 97.27%      97 301003 sun.nio.ch.EPollArrayWrapper.interrupt
+   8  0.21% 97.48%      89 301020 sun.nio.ch.FileDispatcherImpl.read0
+   9  0.21% 97.69%      87 301028 sun.nio.ch.NativeThread.current
+  10  0.20% 97.90%      84 301031 java.lang.Object.hashCode
+  11  0.16% 98.06%      67 300990 sun.nio.ch.EPollArrayWrapper.interrupt
+  12  0.16% 98.22%      67 301038 sun.nio.ch.NativeThread.current
+  13  0.13% 98.35%      54 300985 sun.misc.Unsafe.park
+  14  0.12% 98.47%      50 300982 sun.nio.ch.NativeThread.current
+  15  0.12% 98.59%      50 301005 sun.nio.ch.FileDispatcherImpl.read0
+  16  0.08% 98.67%      33 301062 sun.nio.ch.EPollArrayWrapper.interrupt
+  17  0.06% 98.73%      24 301040 sun.nio.ch.NativeThread.current
+  18  0.03% 98.76%      12 301043 java.util.HashMap.putVal
+  19  0.03% 98.78%      12 301100 java.util.Arrays.copyOf
+  20  0.03% 98.81%      11 301069 sun.nio.ch.IOUtil.drain
+  21  0.02% 98.83%      10 301015 java.io.FileInputStream.readBytes
+  22  0.02% 98.86%       9 301101 sun.nio.ch.NativeThread.current
+  23  0.02% 98.88%       9 301110 java.util.Arrays.copyOf
+  24  0.02% 98.90%       8 300101 java.lang.ClassLoader.defineClass1
+  25  0.02% 98.92%       8 301050 com.codahale.metrics.ExponentiallyDecayingReservoir.update
+  26  0.02% 98.93%       7 301079 org.apache.kafka.clients.producer.internals.Sender$SenderMetrics.updateProduceRequestMetrics
+  27  0.02% 98.95%       7 301125 org.apache.kafka.common.requests.ProduceRequest.<init>
+  28  0.02% 98.97%       7 301199 org.apache.kafka.clients.NetworkClient.send
+  29  0.01% 98.98%       6 301026 org.apache.kafka.common.protocol.types.Schema.sizeOf
+  30  0.01% 99.00%       6 301068 org.apache.kafka.clients.producer.internals.Sender.run
+  31  0.01% 99.01%       6 301070 java.util.HashMap.putVal
+  32  0.01% 99.02%       5 300124 java.util.zip.ZipFile.getEntry
+  33  0.01% 99.03%       5 300659 sun.misc.Unsafe.defineAnonymousClass
+  34  0.01% 99.05%       5 300977 java.lang.System.nanoTime
+  35  0.01% 99.06%       5 301064 java.util.HashMap.putVal
+  36  0.01% 99.07%       5 301078 java.util.TreeMap.put
+  37  0.01% 99.08%       5 301088 org.apache.kafka.common.protocol.types.Schema.write
+  38  0.01% 99.09%       5 301099 com.codahale.metrics.ExponentiallyDecayingReservoir.update
+  39  0.01% 99.11%       5 301132 com.fasterxml.jackson.databind.ser.BeanPropertyWriter.serializeAsField
+CPU SAMPLES END
