@@ -27,13 +27,16 @@ cp /tmp/vagrant-scripts/hermes-traffic.lua /opt/hermes-traffic.lua
 #### wrk2
 
 if [ ! -d /tmp/wrk2 ]; then
-  (
-    cd /tmp
-    git clone https://github.com/giltene/wrk2.git
-    cd wrk2
-    make
-    cp wrk /usr/local/bin
-  )
+    echo "Installing wrk2"
+    (
+        cd /tmp
+        git clone https://github.com/giltene/wrk2.git
+        cd wrk2
+        make
+        cp wrk /usr/local/bin
+        )
+else
+    echo "wrk2 already installed"
 fi
 
 #### prepare profilers dir
@@ -44,6 +47,7 @@ cd /opt/profilers
 #### flamegraphs
 
 if [ ! -d /opt/profilers/FlameGraph ]; then
+    echo "Installing FlameGraph"
     git clone https://github.com/brendangregg/FlameGraph.git /opt/profilers/FlameGraph
     echo "FLAMEGRAPH_DIR=/opt/profilers/FlameGraph" >> /root/.bashrc
 fi
@@ -51,6 +55,7 @@ fi
 #### perf-map-agent
 
 if [ ! -d /opt/profilers/perf-map-agent ]; then
+    echo "Installing perf-map-agent"
     git clone https://github.com/jvm-profiling-tools/perf-map-agent.git /opt/profilers/perf-map-agent
     (
         cd /opt/profilers/perf-map-agent
@@ -61,6 +66,7 @@ fi
 #### async-profiler
 
 if [ ! -d /opt/profilers/async-profiler ]; then
+    echo "Installing async-profiler"
     git clone https://github.com/jvm-profiling-tools/async-profiler.git /opt/profilers/async-profiler
     (
       cd /opt/profilers/async-profiler
@@ -71,6 +77,7 @@ fi
 #### honest-profiler
 
 if [ ! -d /opt/profilers/honest-profiler ]; then
+    echo "Installing honest-profiler"
     git clone https://github.com/jvm-profiling-tools/honest-profiler.git /opt/profilers/honest-profiler
     (
       cd /opt/profilers/honest-profiler
@@ -81,5 +88,6 @@ fi
 #### hprof2flamegraph
 
 if [ ! -d /opt/profilers/hprof2flamegraph ]; then
+    echo "Installing hprof2flamegraph"
     git clone https://github.com/cykl/hprof2flamegraph.git /opt/profilers/hprof2flamegraph
 fi

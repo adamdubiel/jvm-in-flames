@@ -10,8 +10,9 @@ add-apt-repository -y ppa:webupd8team/java
 apt-get update
 apt-get install -y oracle-java8-installer
 
-# reload env to get proper Java variables
-exec bash
+# reload profile to include Java env variables
+. /etc/profile
+ldconfig
 
 #### Kafka
 
